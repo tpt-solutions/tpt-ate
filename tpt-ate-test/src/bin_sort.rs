@@ -12,7 +12,7 @@
 
 use crate::bins::{BinTally, BinTaxonomy};
 use crate::patterns::TestProgram;
-use crate::wafer::{DieCoord, DieTestOutcome, WaferLayout};
+use crate::wafer::{DieCoord, DieTestOutcome, WaferDieMap};
 use serde::{Deserialize, Serialize};
 
 /// Default soft bin when a failing test does not name one: the taxonomy's
@@ -128,7 +128,7 @@ pub fn sort_die(
 /// (counted in the tally but impossible to place on the map).
 pub fn sort_wafer(
     results: &[DieTestResult],
-    wafer: &mut WaferLayout,
+    wafer: &mut WaferDieMap,
     program: &TestProgram,
     taxonomy: &BinTaxonomy,
 ) -> u32 {
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn sort_wafer_fills_map_and_tally() {
-        let mut wafer = WaferLayout::rectangular("W1", 2, 2, 100.0, 100.0);
+        let mut wafer = WaferDieMap::rectangular("W1", 2, 2, 100.0, 100.0);
         let results = vec![
             DieTestResult {
                 coord: DieCoord::new(0, 0),

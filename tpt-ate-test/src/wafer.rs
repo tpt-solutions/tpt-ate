@@ -50,12 +50,45 @@ pub enum DieState {
     Tested(DieTestOutcome),
 }
 
+/// JSON helpers: `serde_json` requires string map keys, so the
+/// coordinate-keyed map exchanges as a list of `{coord, state}` entries.
+mod coord_map_serde {
+    use super::{DieCoord, DieState};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::BTreeMap;
+
+    #[derive(Serialize, Deserialize)]
+    struct Entry {
+        coord: DieCoord,
+        state: DieState,
+    }
+
+    pub fn serialize<S: Serializer>(
+        map: &BTreeMap<DieCoord, DieState>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(
+            map.iter().map(|(coord, state)| Entry { coord: *coord, state: *state }),
+        )
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<BTreeMap<DieCoord, DieState>, D::Error> {
+        Ok(Vec::<Entry>::deserialize(deserializer)?
+            .into_iter()
+            .map(|e| (e.coord, e.state))
+            .collect())
+    }
+}
+
 /// Geometry of the wafer being tested: which die sites exist, their size in
 /// mils (STDF WCR convention), and the coordinate of the wafer center.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct WaferLayout {
+pub struct WaferDieMap {
     pub wafer_id: String,
     /// All valid die sites (both testable and excluded ones).
+    #[serde(with = "coord_map_serde")]
     pub dies: BTreeMap<DieCoord, DieState>,
     /// Die height in mils (STDF WCR `DIE_HT`).
     pub die_height_mils: f32,
@@ -65,7 +98,7 @@ pub struct WaferLayout {
     pub center: DieCoord,
 }
 
-impl WaferLayout {
+impl WaferDieMap {
     /// A rectangular grid of testable dies centered at the grid middle —
     /// the synthetic wafer the simulator and tests run against.
     pub fn rectangular(
@@ -74,14 +107,14 @@ impl WaferLayout {
         rows: i32,
         die_width_mils: f32,
         die_height_mils: f32,
-    ) -> WaferLayout {
+    ) -> WaferDieMap {
         let mut dies = BTreeMap::new();
         for x in 0..cols {
             for y in 0..rows {
                 dies.insert(DieCoord::new(x, y), DieState::Untested);
             }
         }
-        WaferLayout {
+        WaferDieMap {
             wafer_id: wafer_id.to_string(),
             dies,
             die_height_mils,
@@ -144,7 +177,7 @@ mod tests {
 
     #[test]
     fn rectangular_layout_and_counts() {
-        let mut wafer = WaferLayout::rectangular("W1", 4, 4, 100.0, 200.0);
+        let mut wafer = WaferDieMap::rectangular("W1", 4, 4, 100.0, 200.0);
         assert_eq!(wafer.dies.len(), 16);
         assert_eq!(wafer.center, DieCoord::new(2, 2));
         assert!(wafer.record(

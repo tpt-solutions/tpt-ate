@@ -10,7 +10,7 @@ use crate::stdf::codec::{cpu_type, STDF_VERSION_V4};
 use crate::stdf::records::{
     Atr, Bps, Eps, Far, Ftr, Gdr, Hbr, Mir, Mrr, Pcr, Pmr, Ptr, Record, Sbr, Tsr, Wcr, Wir, Wrr,
 };
-use crate::wafer::{DieState, DieTestOutcome, WaferLayout};
+use crate::wafer::{DieState, DieTestOutcome, WaferDieMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Run identity written into the MIR/ATR records.
@@ -49,7 +49,7 @@ pub fn unix_now() -> u32 {
 /// PTR/FTR payloads in per-die coordinate order.
 pub fn build_wafer_run_records(
     program: &TestProgram,
-    wafer: &WaferLayout,
+    wafer: &WaferDieMap,
     results: &[DieTestResult],
     tally: &BinTally,
     taxonomy: &BinTaxonomy,
@@ -306,7 +306,7 @@ fn summarize(
 /// GDR payload: wafer ID length + ID, then per die (in coordinate order)
 /// x:i32, y:i32, hard_bin:u16, soft_bin:u16, passed:u8 — all little-endian.
 /// This is how the wafer map rides inside the STDF file itself.
-fn encode_wafer_map_gdr(wafer: &WaferLayout) -> Vec<u8> {
+fn encode_wafer_map_gdr(wafer: &WaferDieMap) -> Vec<u8> {
     let mut out = Vec::new();
     let id = wafer.wafer_id.as_bytes();
     out.push(id.len() as u8);
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn gdr_roundtrip() {
-        let mut wafer = WaferLayout::rectangular("W7", 2, 1, 100.0, 120.0);
+        let mut wafer = WaferDieMap::rectangular("W7", 2, 1, 100.0, 120.0);
         let tester = SimulatedTester::new(program(), FaultModel::deterministic(5, vec![]));
         let results: Vec<DieTestResult> = wafer
             .dies
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn full_record_stream_is_ordered_and_complete() {
-        let mut wafer = WaferLayout::rectangular("W1", 3, 3, 90.0, 90.0);
+        let mut wafer = WaferDieMap::rectangular("W1", 3, 3, 90.0, 90.0);
         let tester = SimulatedTester::new(
             program(),
             FaultModel::deterministic(9, vec![DieCoord::new(2, 2)]),

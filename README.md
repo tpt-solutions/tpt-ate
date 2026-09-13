@@ -29,24 +29,27 @@ proprietary as their equipment. See `spec.txt` (RFC-003) for the full design.
 
 ## Crates
 
-- **`tpt-ate-test`** — equipment communication (SECS/GEM built against the published SEMI
-  standards), STDF V4 read/write, wafer map model, bin-sort logic, and an equipment
-  simulator harness so all of it is testable without real ATE access.
-- **`tpt-ate-assembly`** — equipment communication for physical assembly behind a pluggable
-  `AssemblyBackend` (wire bonding / flip-chip / chiplet pick-and-place), with placement
-  verification against `tpt-silicon`'s interposer/chiplet layout.
+- **`tpt-ate-comm`** — the shared equipment-communication core: SECS/GEM built against the
+  published SEMI standards (E5 SECS-II, E37.1 HSMS, E30 GEM) plus the deterministic simulator
+  RNG. Extracted from `tpt-ate-test` once `tpt-ate-assembly` made the duplication concrete
+  (per RFC-003 Section 5's locked decision).
+- **`tpt-ate-test`** — STDF V4 read/write, wafer map model, bin-sort logic, and the test
+  equipment simulator harness, so all of it is testable without real ATE access.
+- **`tpt-ate-assembly`** — physical assembly behind a pluggable `AssemblyBackend`
+  (wire bonding / flip-chip / chiplet pick-and-place) over one shared GEM execution flow, with
+  placement verification against `tpt-silicon`'s interposer/chiplet layout.
 - **`tpt-ate-aggregate`** — extends RFC-002's `OutcomeReport` with `TestOutcome` (wafer map,
-  bin distribution, package-level electrical measurements). File-based, manually sent —
-  no new transmission mechanism.
-
-The SECS/GEM equipment-communication core is built inline in `tpt-ate-test` first and
-extracted into a shared internal crate once `tpt-ate-assembly` makes the duplication
-concrete (per RFC-003 Section 5's locked decision).
+  bin distribution under the minimum-cohort rule, package-level electrical measurements).
+  File-based, manually sent — no new transmission mechanism.
 
 ## Status
 
-Early development — see [`todo.md`](todo.md) for the phase-by-phase build checklist and
-`spec.txt` for the source-of-truth design.
+Phase 0–3 of [`todo.md`](todo.md) are implemented and gated by milestone integration tests
+(`phase{1,2,3}_milestone.rs`): simulated wafer sort → valid STDF with correct bins; simulated
+chiplet placement validated against a synthetic interposer layout through all three backends;
+and a deterministic end-to-end run producing an outcome file that round-trips through manual
+ingestion. Remaining: Phase 4 (design-partner pilot, gated externally) and the cross-repo
+dependencies tracked in `todo.md` (`tpt-silicon`'s DFT/ATPG/layout/schema work).
 
 ## License
 

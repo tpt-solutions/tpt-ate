@@ -20,7 +20,7 @@ use tpt_ate_test::secs::hsms::HsmsSession;
 use tpt_ate_test::secs::transport::duplex;
 use tpt_ate_test::sim::{decode_die_report, FaultModel, SimulatedTester};
 use tpt_ate_test::stdf::{Record, StdfReader, StdfWriter};
-use tpt_ate_test::wafer::{DieCoord, DieState, WaferLayout};
+use tpt_ate_test::wafer::{DieCoord, DieState, WaferDieMap};
 
 const SESSION_ID: u16 = 0;
 
@@ -67,8 +67,8 @@ fn program() -> TestProgram {
     }
 }
 
-fn wafer() -> WaferLayout {
-    WaferLayout::rectangular("W01", 5, 5, 120.0, 160.0)
+fn wafer() -> WaferDieMap {
+    WaferDieMap::rectangular("W01", 5, 5, 120.0, 160.0)
 }
 
 /// The seeded fault model: exactly two dies fail — one parametric (VDD_CORE

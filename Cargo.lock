@@ -218,6 +218,9 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tpt-ate-assembly",
+ "tpt-ate-comm",
+ "tpt-ate-test",
  "uuid",
 ]
 

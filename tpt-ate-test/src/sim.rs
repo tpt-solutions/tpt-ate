@@ -15,7 +15,7 @@ use crate::secs::error::{Result, SecsError};
 use crate::secs::gem::{ceid, EquipmentGem, DIE_TESTED_RPTID};
 use crate::secs::hsms::HsmsSession;
 use crate::secs::item::SecsItem;
-use crate::wafer::{DieCoord, DieTestOutcome, WaferLayout};
+use crate::wafer::{DieCoord, DieTestOutcome, WaferDieMap};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
@@ -139,7 +139,7 @@ impl SimulatedTester {
         &self,
         stream: S,
         session_id: u16,
-        wafer: &WaferLayout,
+        wafer: &WaferDieMap,
     ) -> Result<()> {
         let mut session = HsmsSession::new(stream, session_id);
         session.accept_select()?;
