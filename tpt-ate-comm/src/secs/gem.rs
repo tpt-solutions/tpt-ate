@@ -131,18 +131,17 @@ impl<S: Read + Write> EquipmentGem<S> {
         EquipmentGem { session, model_name: model_name.into(), soft_rev: soft_rev.into() }
     }
 
-    /// Serve one inbound transaction, answering the handshake messages the
-    /// equipment must respond to. Returns the (stream, function, body) of
-    /// primaries it does not answer itself (currently: none — everything the
-    /// host sends in this flow is answered).
-    pub fn serve_one(&mut self) -> Result<Option<(u8, u8, Option<SecsItem>)>> {
-        let (stream, function, body) =
-            self.session.serve_one(|_stream, function, _body| match function {
-                1 => Some(s1f2_online_data(&self.model_name, &self.soft_rev)), // S1F1 → S1F2
-                13 => Some(s1f14_establish_communications_ack(true)),          // S1F13 → S1F14
-                _ => None,
-            })?;
-        Ok(Some((stream, function, body)))
+    /// Serve one inbound transaction, answering the standard GEM primaries
+    /// the equipment must respond to: S1F1 (identify), S1F13 (establish
+    /// communications), and S2F41 (host command → S2F42 accept). Returns the
+    /// (stream, function, body) of the primary that was served.
+    pub fn serve_one(&mut self) -> Result<(u8, u8, Option<SecsItem>)> {
+        self.session.serve_one(|_stream, function, _body| match function {
+            1 => Some(s1f2_online_data(&self.model_name, &self.soft_rev)), // S1F1 → S1F2
+            13 => Some(s1f14_establish_communications_ack(true)),          // S1F13 → S1F14
+            41 => Some(s2f42_hcack(HCACK_OK)),                             // S2F41 → S2F42
+            _ => None,
+        })
     }
 
     /// Send S6F11 and consume the S6F12 acknowledge.
@@ -244,6 +243,22 @@ impl<S: Read + Write> HostGem<S> {
         }
     }
 
+    /// Raw SECS transaction: send a primary, return (reply function, body).
+    pub fn transact(
+        &mut self,
+        stream: u8,
+        function: u8,
+        body: Option<SecsItem>,
+    ) -> Result<(u8, Option<SecsItem>)> {
+        self.session.transact(stream, function, body)
+    }
+
+    /// Serve one inbound primary, acknowledging event reports with S6F12
+    /// DACKN 0. Returns the primary's (stream, function, body).
+    pub fn serve_event_reports(&mut self) -> Result<(u8, u8, Option<SecsItem>)> {
+        self.session.serve_one(|_s, _f, _b| Some(s6f12_acknowledge(0)))
+    }
+
     /// Unwrap the underlying HSMS session.
     pub fn into_session(self) -> HsmsSession<S> {
         self.session
@@ -296,5 +311,80 @@ mod tests {
         let bad = SecsItem::List(vec![SecsItem::u4(1)]);
         let err = parse_s6f11(&bad).unwrap_err();
         assert!(matches!(err, SecsError::Gem(_)));
+    }
+}
+
+/// HCACK code for S2F42: command accepted.
+pub const HCACK_OK: u8 = 0;
+
+/// Build S2F41 "Host Command Send": `L,2 [RCMD A, L,n [L,2 [CPNAME A, CPVAL]]]`.
+pub fn s2f41_host_command(rcmd: &str, params: &[(String, SecsItem)]) -> SecsItem {
+    let param_items: Vec<SecsItem> = params
+        .iter()
+        .map(|(name, value)| SecsItem::List(vec![SecsItem::a(name.clone()), value.clone()]))
+        .collect();
+    SecsItem::List(vec![SecsItem::a(rcmd), SecsItem::List(param_items)])
+}
+
+/// Build S2F42 "Host Command Acknowledge" (`B` HCACK).
+pub fn s2f42_hcack(hcack: u8) -> SecsItem {
+    SecsItem::Binary(vec![hcack])
+}
+
+/// Parse an S2F41 body into `(rcmd, params)`.
+pub fn parse_s2f41(body: &SecsItem) -> Result<(String, Vec<(String, SecsItem)>)> {
+    let items = body.as_list().ok_or_else(|| SecsError::Gem("S2F41 body is not a list".into()))?;
+    if items.len() != 2 {
+        return Err(SecsError::Gem(format!("S2F41 body has {} items, expected 2", items.len())));
+    }
+    let rcmd = items[0]
+        .as_ascii()
+        .ok_or_else(|| SecsError::Gem("S2F41 RCMD is not ASCII".into()))?
+        .to_string();
+    let mut params = Vec::new();
+    for param in items[1]
+        .as_list()
+        .ok_or_else(|| SecsError::Gem("S2F41 parameter list is not a list".into()))?
+    {
+        let pair = param
+            .as_list()
+            .ok_or_else(|| SecsError::Gem("S2F41 parameter entry is not a list".into()))?;
+        if pair.len() != 2 {
+            return Err(SecsError::Gem(format!(
+                "S2F41 parameter entry has {} items, expected 2",
+                pair.len()
+            )));
+        }
+        let name = pair[0]
+            .as_ascii()
+            .ok_or_else(|| SecsError::Gem("S2F41 CPNAME is not ASCII".into()))?
+            .to_string();
+        params.push((name, pair[1].clone()));
+    }
+    Ok((rcmd, params))
+}
+
+#[cfg(test)]
+mod host_command_tests {
+    use super::*;
+
+    #[test]
+    fn s2f41_roundtrip() {
+        let body = s2f41_host_command(
+            "PLACE",
+            &[("SITE".to_string(), SecsItem::a("C1")), ("X".to_string(), SecsItem::u4(1200))],
+        );
+        let (rcmd, params) = parse_s2f41(&body).expect("parse");
+        assert_eq!(rcmd, "PLACE");
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].0, "SITE");
+        assert_eq!(params[0].1.as_ascii(), Some("C1"));
+        assert_eq!(params[1].1.as_u4(), Some(1200));
+    }
+
+    #[test]
+    fn s2f41_rejects_malformed() {
+        let bad = SecsItem::List(vec![SecsItem::a("PLACE")]);
+        assert!(parse_s2f41(&bad).is_err());
     }
 }

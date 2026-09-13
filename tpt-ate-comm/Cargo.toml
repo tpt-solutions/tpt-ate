@@ -1,12 +1,11 @@
 [package]
-name = "tpt-ate-test"
+name = "tpt-ate-comm"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-tpt-ate-comm = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

@@ -226,6 +226,16 @@ name = "tpt-ate-assembly"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
+ "thiserror",
+ "tpt-ate-comm",
+]
+
+[[package]]
+name = "tpt-ate-comm"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "thiserror",
 ]
 
@@ -235,6 +245,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "thiserror",
+ "tpt-ate-comm",
 ]
 
 [[package]]

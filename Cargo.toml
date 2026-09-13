@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "tpt-ate-comm",
     "tpt-ate-test",
     "tpt-ate-assembly",
     "tpt-ate-aggregate",
@@ -13,6 +14,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/tpt-solutions/tpt-ate"
 
 [workspace.dependencies]
+tpt-ate-comm = { path = "tpt-ate-comm" }
 tpt-ate-test = { path = "tpt-ate-test" }
 tpt-ate-assembly = { path = "tpt-ate-assembly" }
 tpt-ate-aggregate = { path = "tpt-ate-aggregate" }

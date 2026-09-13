@@ -148,9 +148,7 @@ impl SimulatedTester {
         // Answer whatever handshake the host performs (S1F1 and/or S1F13).
         let mut served = 0;
         while served < 2 {
-            if gem.serve_one()?.is_none() {
-                break;
-            }
+            gem.serve_one()?;
             served += 1;
         }
 

@@ -7,8 +7,9 @@
 //! to the wafer map, and records results in STDF.
 //!
 //! Layers:
-//! - [`secs`]: SECS/GEM equipment communication (SEMI E5/E30/E37), our own
-//!   implementation built directly against the published standards.
+//! - [`secs`] / [`rng`] (from `tpt-ate-comm`): SECS/GEM equipment
+//!   communication and the deterministic simulator RNG — the shared core
+//!   extracted once `tpt-ate-assembly` made the duplication concrete.
 //! - [`stdf`]: STDF V4 read/write — the industry-standard result-data
 //!   format (distinct from SECS/GEM, which is the communication layer).
 //! - [`wafer`]: wafer map model keyed by physical die location, carried
@@ -25,12 +26,12 @@
 //! Explicitly out of scope: test program *authoring* (fault targeting,
 //! pattern compaction) — that belongs to `tpt-silicon`.
 
+pub use tpt_ate_comm::{rng, secs};
+
 pub mod bin_sort;
 pub mod bins;
 pub mod patterns;
 pub mod recording;
-pub mod rng;
-pub mod secs;
 pub mod sim;
 pub mod stdf;
 pub mod wafer;
