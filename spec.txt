@@ -1,0 +1,168 @@
+# RFC-003: Test & Assembly Operational Software — `tpt-ate`
+
+**Status:** Proposed
+
+**Target Workspace:** a new standalone repository, `tpt-solutions/tpt-ate`, kept separate from
+`tpt-silicon` and `tpt-fab` for the same reason those two are separate from each other: runtime and
+audience, not physical manufacturing stage. Design-time test and packaging work — DFT insertion,
+ATPG pattern generation, interposer/chiplet layout — stays inside `tpt-silicon` (the latter per
+RFC-001's existing chiplet-first co-design suggestion). `tpt-ate` covers only the operational half:
+software that runs against real test and assembly equipment on a production floor, the same
+category `tpt-fab` occupies one physical stage earlier. Uses `tpt-telos` and `tpt-ai` as
+cross-cutting dependencies, consistent with the rest of the portfolio. Extends RFC-002 (`spec3.txt`)
+rather than replacing it — the file-based outcome loop defined there is reused here, not rebuilt.
+
+**Goal:** Cover the two operational stages between "wafer comes off the line" (where `tpt-fab`
+stops) and "chip ships" — test and assembly — which nothing in `tpt-silicon`, RFC-001, or RFC-002
+currently touches.
+
+---
+
+## 1. Executive Summary
+
+Real chips don't ship straight from wafer fab. Every die gets electrically tested before it's
+trusted, and most non-trivial designs today get packaged as multiple dies (chiplets) assembled
+together rather than one monolithic die. Both steps are equipment-operated, both happen at
+facilities that are often distinct from the wafer fab itself (an OSAT — outsourced semiconductor
+assembly and test — commonly does both under one roof), and neither has any coverage in this
+portfolio yet.
+
+This RFC proposes `tpt-ate` as the operational counterpart to the design-time work `tpt-silicon`
+already does (or, per RFC-001, is being extended to do) for DFT and package layout:
+
+- **`tpt-ate-test`** — equipment communication and test execution: runs the ATPG patterns
+  `tpt-silicon` generated against real automated test equipment (ATE), sorts die into bins by
+  result.
+- **`tpt-ate-assembly`** — equipment communication for physical assembly: wire bonding, flip-chip
+  placement, chiplet pick-and-place, guided by the interposer/chiplet layout `tpt-silicon` produced.
+- **`tpt-ate-aggregate`** — extends RFC-002's `OutcomeReport` file exchange with bin/yield data,
+  rather than defining a new channel. Same file-based, no-live-API discipline as `tpt-fab`.
+
+**Repo boundary, decided:** kept as one repository rather than split into `tpt-ate-test` and
+`tpt-ate-assembly` as separate repos, because the two share an equipment-communication core and
+because the real industry organizes them this way — an OSAT sells test and assembly as one bundled
+service, not two. Splitting them here would fight how the field is actually structured for no
+real benefit.
+
+Positioning is the same tier as `tpt-fab`: not aimed at the large, vertically-integrated OSATs
+(Amkor, ASE) whose test/assembly software is as proprietary and mature as the tier-one wafer
+toolmakers'. Aimed at smaller and emerging OSATs, and at fabs handling test/assembly in-house
+without an enterprise software budget — the same audience this whole roadmap has been built for.
+
+---
+
+## 2. Proposed New Crates
+
+### A. `tpt-ate-test` (New — core)
+
+* **Purpose:** equipment communication with automated test equipment, test program execution,
+  bin sorting.
+* **Key features:**
+  - Equipment communication layer, built against the published SEMI standards the same way
+    `tpt-fab` was — ATE tooling largely speaks the same SECS/GEM family as wafer-fab equipment,
+    so this isn't a new protocol problem, just a new application of one already solved in `tpt-fab`.
+    Kept as its own implementation inside `tpt-ate` rather than shared with `tpt-fab`, consistent
+    with the earlier decision not to split protocol handling into a shared dependency.
+  - **STDF (Standard Test Data Format)** read/write — the actual industry-standard format test
+    results are recorded in, distinct from SECS/GEM (which is the equipment-communication layer,
+    not the result-data format). Both are needed; they solve different problems.
+  - Bin-sort logic: consumes `tpt-silicon`'s ATPG pattern output and DFT-inserted netlist metadata,
+    executes against equipment (real or `tpt-fab`-style simulator), records pass/fail/bin-category
+    per die, keyed to a wafer map (physical die location) so results can be correlated back to
+    layout.
+* **Explicitly not included:** test program *authoring* — deciding which faults to target, pattern
+  compaction strategy. That's design-time work, belongs with ATPG generation in `tpt-silicon`.
+  `tpt-ate-test` executes what it's given.
+
+### B. `tpt-ate-assembly` (New)
+
+* **Purpose:** equipment communication for physical assembly — wire bonding, flip-chip, chiplet
+  pick-and-place.
+* **Key features:** shares the equipment-communication core with `tpt-ate-test` (same SECS/GEM-
+  family layer, different equipment class); consumes `tpt-silicon`'s interposer/chiplet layout
+  (RFC-001) as its placement reference the same way `tpt-ate-test` consumes ATPG patterns.
+* **Design intent:** like `tpt-fab-litho`'s pluggable backend pattern, assembly technique (wire
+  bond vs. flip-chip vs. chiplet placement) is a swappable backend behind one core, not three
+  separate crates — the equipment-communication and placement-verification logic is identical
+  regardless of which physical technique a given OSAT uses.
+
+### C. `tpt-ate-aggregate` (New — extends, does not replace, RFC-002's outcome loop)
+
+* **Purpose:** produces the same `OutcomeReport` file format defined in `spec3.txt` Section 4,
+  extended with fields this stage actually has and `tpt-fab` doesn't:
+
+```rust
+pub struct TestOutcome {
+    pub wafer_map: WaferDieMap,          // per-die bin result, keyed by physical location
+    pub bin_summary: BinDistribution,    // yield by bin category, aggregated per the same
+                                          // minimum-cohort rule as spec3 Section 4.4
+    pub package_test: Vec<ElectricalMeasurement>, // post-assembly test, same shape as
+                                                    // spec3's ElectricalMeasurement, reused
+}
+```
+
+  `TestOutcome` is carried inside `OutcomeReport.process_notes` / a new `track` variant
+  (`ManufacturingTrack::TestAssembly`) rather than a parallel file format — one schema, one
+  ingestion path into `tpt-ai`, as spec3 Section 3 already established the principle for.
+* **No new transmission mechanism.** File-based, manually sent, exactly as spec3 Section 4.8
+  mandates. Bin-sort and yield data is exactly the kind of ground truth that should calibrate
+  `tpt-ai`'s yield-heatmap model and `tpt-fab-process`'s OPC/etch simulator — a die that failed
+  in a location the etch simulator flagged as marginal is a direct, high-value calibration point.
+
+---
+
+## 3. Data Flow
+
+`tpt-silicon` (DFT-inserted netlist + ATPG patterns + wafer map format) → exported, same pattern as
+`tpt-silicon-cam`'s SMP export in RFC-001 → `tpt-ate-test` executes against real or simulated
+equipment → bin/yield results recorded in STDF → summarized into `TestOutcome` → carried inside an
+`OutcomeReport` file → sent back manually, aggregated client-side exactly as spec3 Section 4.2
+describes → ingested, calibrates the same models `tpt-fab`'s outcome data does.
+
+No new data-flow philosophy here — this is spec3's loop, walked one stage further down the line.
+
+---
+
+## 4. Recommended Execution Plan
+
+**Phase 1 — `tpt-ate-test` core (Weeks 1–5):** equipment-communication layer (reusing the SECS/GEM
+implementation pattern from `tpt-fab`, not the code itself), STDF read/write, bin-sort logic against
+an equipment simulator. Milestone: a simulated test run against synthetic ATPG patterns produces a
+valid STDF file with correct bin categorization.
+
+**Phase 2 — `tpt-silicon` DFT/ATPG generation (Weeks 1–5, parallel):** this is the design-time half
+and belongs in `tpt-silicon`, not here — called out explicitly because `tpt-ate-test` has nothing
+to execute without it. Scan-chain insertion extending `tpt-synth`, ATPG pattern generation as a new
+`tpt-silicon` crate. Milestone: a sky130 design produces a DFT-inserted netlist and a pattern set
+`tpt-ate-test` can consume.
+
+**Phase 3 — `tpt-ate-assembly` (Weeks 6–10):** shared equipment-communication core extracted from
+Phase 1's work, pluggable assembly-technique backends, consuming `tpt-silicon`'s RFC-001 interposer
+layout. Milestone: a simulated chiplet placement run validates against a synthetic interposer
+layout with no equipment-technique assumptions hard-coded into the core.
+
+**Phase 4 — `tpt-ate-aggregate` and schema extension (Weeks 11–14):** `TestOutcome`,
+`ManufacturingTrack::TestAssembly`, wired into the same `tpt-ai` ingestion path as `tpt-fab`'s
+outcome data. Milestone: a synthetic end-to-end run — design, DFT insertion, simulated test,
+simulated assembly, outcome file generated and manually ingested — completes without a design
+partner, the same bar spec3 Phase 4 set for the wafer-fab loop.
+
+**Phase 5 — Design partner pilot (Month 4+):** approach a smaller or emerging OSAT, per the
+positioning in Section 1. Gated on someone outside `tpt-solutions` saying yes, same as spec3
+Phase 5.
+
+---
+
+## 5. Open Questions
+
+- Whether `tpt-ate-test` and `tpt-ate-assembly`'s shared equipment-communication core should be
+  factored into its own internal crate within the `tpt-ate` workspace from day one, or extracted
+  once Phase 3 makes the duplication concrete — premature abstraction risk either way.
+- Whether wafer-map die-location data needs its own interchange format shared with `tpt-fab` (a
+  die tested by `tpt-ate` and a die processed by `tpt-fab` need to agree on the same physical
+  coordinate system) or whether this is already implicit in `tpt-silicon`'s layout data and just
+  needs to be carried through unmodified.
+- Whether the pre-RTL / architecture-exploration layer (HLS, performance modeling, design-space
+  exploration) belongs as new `tpt-silicon` crates extending the front end upstream of Silica, the
+  mirror of RFC-001's downstream PCB extension — flagged here as a likely next RFC, not scoped in
+  this one.
