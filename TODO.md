@@ -130,12 +130,16 @@ lands ATPG/DFT.)*
       there, kept minimal for that move).
 
 ## Cross-repo dependencies (tracked here for visibility, not owned by this repo)
-- `tpt-silicon`: DFT/ATPG generation (Phase 1 blocker — *still pending there*; placeholder
-  program shape consumed by `tpt-ate-test/src/patterns.rs`), interposer/chiplet layout (Phase 2
-  blocker — *still pending there*; `InterposerLayout` stand-in in `tpt-ate-assembly/src/layout.rs`),
-  RFC-002's `OutcomeReport`/`ManufacturingTrack`/`ElectricalMeasurement` schema (Phase 3
-  blocker, defined in `tpt-silicon/spec3.txt` Section 4 — *first materialized in
-  `tpt-ate-aggregate/src/schema.rs`*).
+- `tpt-silicon`: ~~DFT/ATPG generation~~, ~~interposer/chiplet layout~~, ~~RFC-002 schema~~ —
+  **now implemented there** (commit `d27b566`, Aug/Sep 2026): `tpt-dft` (mux-D scan insertion +
+  good-machine pattern generation, emitting the `ScanHandoff` JSON whose `AteTestProgram` mirrors
+  `tpt-ate-test/src/patterns.rs` field-for-field — the milestone test pins that contract through
+  a consumer-side mirror type), `tpt-interposer` (RFC-001 layout whose serde shapes are
+  byte-compatible with `tpt-ate-assembly`'s `InterposerLayout`), and `tpt-mfg-schema` (the
+  canonical RFC-002 §4 + RFC-003 outcome schema; `tpt-ate-aggregate/src/schema.rs` keeps a
+  mirrored copy with identical serde shapes until crates publish cross-repo). The local
+  placeholder/stand-in types here stay until `tpt-ate` switches to consuming those crates via
+  published packages (path deps across repos would break this repo's CI checkout).
 - `tpt-fab`: SECS/GEM implementation pattern to reuse (not share code with) for Phase 1.
   *(Survey finding: `tpt-fab` is spec-only — no SECS/GEM code exists there to reuse; `tpt-ate`'s
   layer is a green-field implementation against the published SEMI standards, which RFC-003
