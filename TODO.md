@@ -105,6 +105,54 @@ lands ATPG/DFT.)*
   chiplet assembly, outcome file generated and manually ingested — completes without a design
   partner, and is byte-deterministic across runs.
 
+## Phase 3.5 — Hardening (found by code audit, 2026-09-16)
+Bugs and gaps surfaced by a full manual review of `tpt-ate-comm`, `tpt-ate-test`,
+`tpt-ate-assembly`, `tpt-ate-aggregate`. Grouped as bug fixes (correctness issues reachable from
+real/untrusted input) vs. real-equipment blockers (things that work fine in simulation but would
+break or hang against actual ATE/assembly tools).
+
+**Bug fixes:**
+- [ ] `tpt-ate-comm/src/secs/item.rs` `decode_item`: cap recursion depth on nested `List` items —
+      unbounded recursion on a crafted/corrupt SECS-II message can stack-overflow the process
+- [ ] `tpt-ate-comm/src/secs/hsms.rs`: enforce a max frame-size guard on the length prefix before
+      allocating, to bound worst-case allocation from a hostile/misbehaving peer
+- [ ] `tpt-ate-test/src/stdf/reader.rs` `next_record`: retry on short reads of the 4-byte record
+      header instead of treating any partial `Read::read` as `ShortRecordHeader` (matches the
+      correct retry loop already used for record bodies) — as written this spuriously fails on
+      real streaming (socket/pipe) sources
+- [ ] `tpt-ate-test/src/recording.rs` `decode_wafer_map_gdr`: bounds-check `data[1..1+id_len]`
+      before slicing; a short/malformed GDR record currently panics instead of returning `None`
+- [ ] `tpt-ate-test/src/stdf/codec.rs` `write::cn`/`k_bytes`/`sn`: return `Result` instead of
+      `assert!`-panicking when a field exceeds STDF's size limit
+- [ ] `tpt-ate-test/src/stdf/records.rs`: either implement the documented tail-byte preservation
+      (`Record::parse` currently drops unparsed trailing bytes on partially-modeled known
+      records) or fix the module doc comment — the byte-lossless round-trip contract is currently
+      false for vendor-extended files
+
+**Real-equipment blockers (works in simulation only):**
+- [ ] Add a real TCP transport for HSMS and make `tpt-ate-assembly`'s backends generic over
+      `Read + Write` instead of hardcoded to `SimStream` — nothing today can open a socket to
+      actual equipment
+- [ ] Implement SEMI E37 T3/T5/T6/T7/T8 timers and retry/reconnect logic in the HSMS/GEM layer
+      (`hsms.rs` `select`/`transact`, `assembly/link.rs` `await_placement_event`) — a stalled or
+      silent peer currently hangs the process forever
+- [ ] Ship a CLI binary (`clap`/`toml` are already workspace deps but unused by any `src/bin`) —
+      e.g. `tpt-ate connect <ip:port> --config tester.toml`, `stdf convert/inspect/diff` — there is
+      currently no way to run any of this against a real line
+- [ ] Add `tracing`/`log` instrumentation through the comm and STDF I/O layers — zero production
+      observability today
+- [ ] Give `tpt-ate-aggregate`'s ingestor durable storage (append/index over a directory of
+      outcome files) — the reference `RecordingIngestor` is an in-memory `Vec` that loses
+      everything on restart
+
+**CI / process:**
+- [ ] Enforce `cargo clippy --all-targets -- -D warnings` in CI (lint config already sets
+      `[workspace.lints.clippy] all = "warn"` but CI never runs clippy)
+- [ ] Add `cargo fmt --check` and `cargo audit` (or `cargo-deny`) to CI
+- [ ] Add adversarial/fuzz-style tests for STDF (truncated body, oversized length, bad FAR) and
+      HSMS (malformed frame, mid-session disconnect) — currently only clean-roundtrip paths are
+      tested
+
 ## Phase 4 — Design partner pilot (Month 4+)
 - [ ] Identify candidate: a smaller or emerging OSAT, or a fab handling test/assembly in-house
       without an enterprise software budget (per spec.txt Section 1 positioning — explicitly not
@@ -128,6 +176,24 @@ lands ATPG/DFT.)*
       supporting types) from `tpt-ate-aggregate/src/schema.rs` into the shared schema home once
       `tpt-silicon` materializes RFC-002 in code (they are currently first materializations
       there, kept minimal for that move).
+
+## Adoption & innovation backlog (not gating Phase 4, but improves it)
+- [ ] Wafer-map / bin-yield visualizer (SVG or terminal heatmap) rendered from `WaferDieMap` — the
+      most demo-able artifact for a prospective design partner, and the data model already exists
+- [ ] `tpt-ate-test replay` fuzz/property-test harness driving the deterministic simulator RNG
+      with adversarial STDF/HSMS byte streams (also covers the adversarial-testing item above)
+- [ ] STDF ⇄ JSON/CSV bridge for the future `tpt-ai` yield-calibration ingestion path — ship this
+      before `tpt-ai`'s side exists so `tpt-ate` is the reference shape, not the follower
+- [ ] `tpt-ate-simulate` as a standalone binary (not just test-harness code) exposing a GEM host
+      on a real port, so an adopter can test their MES integration before owning ATE hardware
+- [ ] `examples/quickstart`: one `cargo run --example quickstart` that runs simulator → bin-sort →
+      STDF write → `OutcomeReport` → yield summary end-to-end, no real equipment required
+- [ ] Sample `tester.toml`/`assembly.toml` config templates with inline comments per SECS/GEM
+      parameter (device ID, timeouts once implemented, HSMS mode)
+- [ ] "Integrating your ATE" doc: which SECS/GEM messages equipment must support, how to point
+      `tpt-ate-test` at real equipment instead of the simulator, self-certification checklist
+- [ ] Paired fixture/example showing a real `tpt-silicon` → `tpt-ate-test` handoff end-to-end, now
+      that `tpt-silicon`'s DFT/ATPG/layout crates exist (see Cross-repo dependencies below)
 
 ## Cross-repo dependencies (tracked here for visibility, not owned by this repo)
 - `tpt-silicon`: ~~DFT/ATPG generation~~, ~~interposer/chiplet layout~~, ~~RFC-002 schema~~ —
