@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "SECS/GEM (SEMI E5/E30/E37) equipment communication core with an in-memory simulator transport"
+readme = "README.md"
+categories = ["development-tools", "simulation"]
+keywords = ["secs-gem", "hsms", "semi-e5", "equipment", "semiconductor"]
 
 [dependencies]
 serde = { workspace = true }

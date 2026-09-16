@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "RFC-002 outcome-file aggregation for the test and assembly stage: TestOutcome, bin distributions, and the file-based exchange loop"
+readme = "README.md"
+categories = ["data-structures", "development-tools"]
+keywords = ["outcome-report", "yield", "binning", "manufacturing", "osat"]
 
 [dependencies]
 tpt-ate-test = { workspace = true }

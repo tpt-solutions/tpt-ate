@@ -153,6 +153,17 @@ break or hang against actual ATE/assembly tools).
       HSMS (malformed frame, mid-session disconnect) — currently only clean-roundtrip paths are
       tested
 
+## Phase 3.5 — Packaging readiness (pre-publish)
+- [x] Per-crate `README.md` (comprehensive: overview, features, install, usage,
+      architecture position, scope/limitations, testing, license) for all four crates
+- [x] Per-crate `CHANGELOG.md` (Keep a Changelog format, 0.1.0 entry)
+- [x] Crates.io metadata in every manifest: `description`, `readme`, `categories`,
+      `keywords`
+- [ ] Publish to crates.io — explicitly deferred (the user-gated step; also the gate for
+      swapping the mirrored RFC-002 schema types below for the canonical
+      `tpt-silicon` `tpt-silicon-mfg-schema` dependency, since cross-repo path deps would break
+      this repo's CI checkout)
+
 ## Phase 4 — Design partner pilot (Month 4+)
 - [ ] Identify candidate: a smaller or emerging OSAT, or a fab handling test/assembly in-house
       without an enterprise software budget (per spec.txt Section 1 positioning — explicitly not
@@ -164,18 +175,22 @@ break or hang against actual ATE/assembly tools).
 ---
 
 ## Backlog / Open Questions (from spec.txt Section 5)
-- [ ] Revisit: does wafer-map die-location data ever need its own interchange format shared with
+- [x] Revisit: does wafer-map die-location data ever need its own interchange format shared with
       `tpt-fab`, or does carrying it through unmodified from `tpt-silicon` hold up in practice?
-      (Default resolved above as "carry through unmodified" — revisit only if a real mismatch
-      surfaces during Phase 1/2 integration. No mismatch surfaced in Phases 1–3.)
+      **Reviewed after Phases 1-3 and the `tpt-silicon` deliverables: carrying through
+      unmodified holds.** `WaferDieMap` and `tpt-silicon-interposer`'s layout keep the source
+      conventions with serde shapes byte-compatible on both sides; no `tpt-fab` format and no
+      transformation layer were needed. Reopen only if a real mismatch ever surfaces.
 - [ ] Track as a likely next RFC, not scoped here: pre-RTL / architecture-exploration layer (HLS,
       performance modeling, design-space exploration) as new `tpt-silicon` front-end crates —
       mirrors RFC-001's downstream PCB extension but upstream. Lives in `tpt-silicon`, not
       `tpt-ate`, if it happens.
 - [ ] Move RFC-002 schema types (`OutcomeReport`, `ManufacturingTrack`, `ElectricalMeasurement`,
-      supporting types) from `tpt-ate-aggregate/src/schema.rs` into the shared schema home once
-      `tpt-silicon` materializes RFC-002 in code (they are currently first materializations
-      there, kept minimal for that move).
+      supporting types) from `tpt-ate-aggregate/src/schema.rs` into the shared schema home.
+      **`tpt-silicon` has now materialized them** (`tpt-silicon-mfg-schema`, the canonical home, with
+      serde shapes identical to our mirror — files already interchange). The move itself is
+      gated on publishing (see Phase 3.5): it requires depending on that crate across repos,
+      which waits for crates.io packages rather than brittle path deps.
 
 ## Adoption & innovation backlog (not gating Phase 4, but improves it)
 - [ ] Wafer-map / bin-yield visualizer (SVG or terminal heatmap) rendered from `WaferDieMap` — the
@@ -197,11 +212,11 @@ break or hang against actual ATE/assembly tools).
 
 ## Cross-repo dependencies (tracked here for visibility, not owned by this repo)
 - `tpt-silicon`: ~~DFT/ATPG generation~~, ~~interposer/chiplet layout~~, ~~RFC-002 schema~~ —
-  **now implemented there** (commit `d27b566`, Aug/Sep 2026): `tpt-dft` (mux-D scan insertion +
+  **now implemented there** (commit `d27b566`, Aug/Sep 2026): `tpt-silicon-dft` (mux-D scan insertion +
   good-machine pattern generation, emitting the `ScanHandoff` JSON whose `AteTestProgram` mirrors
   `tpt-ate-test/src/patterns.rs` field-for-field — the milestone test pins that contract through
-  a consumer-side mirror type), `tpt-interposer` (RFC-001 layout whose serde shapes are
-  byte-compatible with `tpt-ate-assembly`'s `InterposerLayout`), and `tpt-mfg-schema` (the
+  a consumer-side mirror type), `tpt-silicon-interposer` (RFC-001 layout whose serde shapes are
+  byte-compatible with `tpt-ate-assembly`'s `InterposerLayout`), and `tpt-silicon-mfg-schema` (the
   canonical RFC-002 §4 + RFC-003 outcome schema; `tpt-ate-aggregate/src/schema.rs` keeps a
   mirrored copy with identical serde shapes until crates publish cross-repo). The local
   placeholder/stand-in types here stay until `tpt-ate` switches to consuming those crates via

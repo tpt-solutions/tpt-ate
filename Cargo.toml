@@ -14,10 +14,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/tpt-solutions/tpt-ate"
 
 [workspace.dependencies]
-tpt-ate-comm = { path = "tpt-ate-comm" }
-tpt-ate-test = { path = "tpt-ate-test" }
-tpt-ate-assembly = { path = "tpt-ate-assembly" }
-tpt-ate-aggregate = { path = "tpt-ate-aggregate" }
+tpt-ate-comm = { path = "tpt-ate-comm", version = "0.1.0" }
+tpt-ate-test = { path = "tpt-ate-test", version = "0.1.0" }
+tpt-ate-assembly = { path = "tpt-ate-assembly", version = "0.1.0" }
+tpt-ate-aggregate = { path = "tpt-ate-aggregate", version = "0.1.0" }
 
 # External dependencies
 clap = { version = "4", features = ["derive"] }

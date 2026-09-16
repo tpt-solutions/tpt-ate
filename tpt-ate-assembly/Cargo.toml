@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Equipment communication for wire bonding, flip-chip, and chiplet pick-and-place with placement verification"
+readme = "README.md"
+categories = ["development-tools", "simulation"]
+keywords = ["assembly", "chiplet", "placement", "wire-bond", "flip-chip"]
 
 [dependencies]
 tpt-ate-comm = { workspace = true }

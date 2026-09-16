@@ -67,9 +67,8 @@ mod coord_map_serde {
         map: &BTreeMap<DieCoord, DieState>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        serializer.collect_seq(
-            map.iter().map(|(coord, state)| Entry { coord: *coord, state: *state }),
-        )
+        serializer
+            .collect_seq(map.iter().map(|(coord, state)| Entry { coord: *coord, state: *state }))
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(

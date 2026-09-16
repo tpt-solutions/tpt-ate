@@ -29,16 +29,16 @@ proprietary as their equipment. See `spec.txt` (RFC-003) for the full design.
 
 ## Crates
 
-- **`tpt-ate-comm`** — the shared equipment-communication core: SECS/GEM built against the
+- **[`tpt-ate-comm`](tpt-ate-comm/README.md)** — the shared equipment-communication core: SECS/GEM built against the
   published SEMI standards (E5 SECS-II, E37.1 HSMS, E30 GEM) plus the deterministic simulator
   RNG. Extracted from `tpt-ate-test` once `tpt-ate-assembly` made the duplication concrete
   (per RFC-003 Section 5's locked decision).
-- **`tpt-ate-test`** — STDF V4 read/write, wafer map model, bin-sort logic, and the test
+- **[`tpt-ate-test`](tpt-ate-test/README.md)** — STDF V4 read/write, wafer map model, bin-sort logic, and the test
   equipment simulator harness, so all of it is testable without real ATE access.
-- **`tpt-ate-assembly`** — physical assembly behind a pluggable `AssemblyBackend`
+- **[`tpt-ate-assembly`](tpt-ate-assembly/README.md)** — physical assembly behind a pluggable `AssemblyBackend`
   (wire bonding / flip-chip / chiplet pick-and-place) over one shared GEM execution flow, with
   placement verification against `tpt-silicon`'s interposer/chiplet layout.
-- **`tpt-ate-aggregate`** — extends RFC-002's `OutcomeReport` with `TestOutcome` (wafer map,
+- **[`tpt-ate-aggregate`](tpt-ate-aggregate/README.md)** — extends RFC-002's `OutcomeReport` with `TestOutcome` (wafer map,
   bin distribution under the minimum-cohort rule, package-level electrical measurements).
   File-based, manually sent — no new transmission mechanism.
 

@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "STDF V4 read/write, wafer-map bin sorting, and an ATE simulator over SECS/GEM"
+readme = "README.md"
+categories = ["development-tools", "simulation", "encoding"]
+keywords = ["stdf", "ate", "wafer-map", "bin-sort", "semiconductor"]
 
 [dependencies]
 tpt-ate-comm = { workspace = true }
